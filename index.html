@@ -1,22 +1,61 @@
-
+<!DOCTYPE html>
 <html>
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
+    
+    <style>
+      /* ปุ่มสำหรับกดเริ่มเสียง (เพื่อแก้ปัญหา Browser Block Audio) */
+      #ui-overlay {
+        position: fixed; top: 10px; left: 10px; z-index: 999;
+        padding: 15px; background: rgba(0,0,0,0.5); color: white;
+        border-radius: 10px; cursor: pointer; font-family: sans-serif;
+      }
+    </style>
   </head>
   <body>
-    <a-scene mindar-image="imageTargetSrc: targets.mind;" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+
+    <div id="ui-overlay" onclick="this.style.display='none'">
+      แตะหน้าจอ 1 ครั้ง เพื่อเริ่มระบบเสียง AR
+    </div>
+
+    <a-scene mindar-image="imageTargetSrc: ./targets.mind;" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+      
       <a-assets>
-        <img id="card" src="390376.jpg" />
-        <a-asset-item id="avatarModel" src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/softmind/scene.gltf"></a-asset-item>
+        <a-asset-item id="myModel" src="./model.glb"></a-asset-item>
+        <audio id="myAudio" src="./track.mp3" preload="auto"></audio>
       </a-assets>
 
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-      <a-entity mindar-image-target="targetIndex: 0">
-        <a-plane src="#card" position="0 0 0" height="0.552" width="1" rotation="0 0 0"></a-plane>
-        <a-gltf-model rotation="0 0 0 " position="0 0 0.1" scale="0.005 0.005 0.005" src="#avatarModel" animation="property: position; to: 0 0.1 0.1; dur: 1000; easing: easeInOutQuad; loop: true; dir: alternate">
+
+      <a-entity id="ar-target" mindar-image-target="targetIndex: 0">
+        
+        <a-gltf-model src="#myModel" rotation="0 0 0" position="0 0 0" scale="0.1 0.1 0.1"></a-gltf-model>
+
+        <a-text value="Welcome to AR World!" position="0 0.8 0" align="center" color="#FFFFFF" width="3"></a-text>
+
       </a-entity>
     </a-scene>
+
+    <script>
+      // ส่วนของคำสั่งควบคุมเสียง (JavaScript)
+      const targetEntity = document.querySelector('#ar-target');
+      const audio = document.querySelector('#myAudio');
+
+      // เมื่อสแกนเจอรูป (Target Found)
+      targetEntity.addEventListener("targetFound", event => {
+        console.log("Target found!");
+        audio.play(); // สั่งให้เสียงเล่น
+      });
+
+      // เมื่อเลื่อนกล้องหนีออกจากรูป (Target Lost)
+      targetEntity.addEventListener("targetLost", event => {
+        console.log("Target lost");
+        audio.pause(); // สั่งให้เสียงหยุด
+        audio.currentTime = 0; // รีเซ็ตเสียงไปเริ่มต้นใหม่
+      });
+    </script>
+
   </body>
 </html>
