@@ -4,44 +4,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-    
     <style>
       #ui-overlay {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background: rgba(0,0,0,0.9); z-index: 9999;
         display: flex; flex-direction: column; justify-content: center;
-        align-items: center; color: white; font-family: sans-serif; text-align: center;
+        align-items: center; color: white; font-family: sans-serif;
       }
-      button {
-        padding: 20px 40px; font-size: 22px; cursor: pointer;
-        background: #007bff; border: none; color: white; border-radius: 50px;
-      }
-      /* ส่วนแสดงสถานะเพื่อการ Debug */
-      #debug-log {
-        position: fixed; bottom: 10px; left: 10px; color: yellow; 
-        background: rgba(0,0,0,0.5); z-index: 1000; font-size: 12px; pointer-events: none;
-      }
+      button { padding: 15px 30px; font-size: 20px; cursor: pointer; background: #2196F3; border: none; color: white; border-radius: 5px; }
     </style>
   </head>
-  
   <body>
-    <div id="debug-log">Status: Waiting for Start...</div>
-
     <div id="ui-overlay">
-      <h2>AR Audio System</h2>
-      <p>กดปุ่มเพื่ออนุญาตสิทธิ์การใช้เสียง</p>
-      <button id="start-button">START AR</button>
+      <button id="start-button">เริ่มใช้งาน (Start)</button>
     </div>
 
-    <audio id="my-audio" src="./voice.mp3" preload="auto" playsinline></audio>
+    <audio id="audio-raw" src="voice.mp3" preload="auto" playsinline></audio>
 
-    <a-scene 
-      mindar-image="imageTargetSrc: ./targets.mind; autoStart: false;" 
-      embedded color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" 
-      vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
-      
+    <a-scene mindar-image="imageTargetSrc: ./targets.mind; autoStart: false;" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
       <a-entity id="ar-target" mindar-image-target="targetIndex: 0">
         <a-text value="How old are you?" color="#FFD700" align="center" width="4" position="0 0 0"></a-text>
       </a-entity>
@@ -52,43 +33,29 @@
       const overlay = document.querySelector("#ui-overlay");
       const sceneEl = document.querySelector("a-scene");
       const arTarget = document.querySelector("#ar-target");
-      const audio = document.querySelector("#my-audio");
-      const debugLog = document.querySelector("#debug-log");
-
-      // ฟังก์ชันเขียน Log บนหน้าจอเพื่อเช็กว่าโค้ดทำงานถึงไหน
-      function log(msg) {
-        debugLog.innerText = "Status: " + msg;
-        console.log(msg);
-      }
+      const myAudio = document.querySelector("#audio-raw");
 
       startButton.addEventListener('click', () => {
-        log("Starting...");
         overlay.style.display = "none";
+        
+        // 1. ปลดล็อกเสียงทันทีที่กดปุ่ม (หัวใจสำคัญของ iOS/Chrome)
+        myAudio.play().then(() => {
+            myAudio.pause();
+            myAudio.currentTime = 0;
+            console.log("Audio is unlocked and ready!");
+        }).catch(err => console.log("Unlock error: ", err));
 
-        // 2. เทคนิคการ "ปลดล็อก" เสียง (สำคัญมากสำหรับ iOS)
-        // สั่งให้เล่นเสียงสั้นๆ ทันทีที่กดปุ่ม เพื่อขอสิทธิ์ Browser
-        audio.play().then(() => {
-          audio.pause();
-          audio.currentTime = 0;
-          log("Audio Unlocked!");
-        }).catch(err => {
-          log("Audio Error: " + err);
-        });
-
-        // เริ่มระบบ AR
+        // 2. เริ่ม AR
         sceneEl.systems["mindar-image-system"].start();
       });
 
-      // 3. เมื่อเจอภาพ ให้สั่งเล่นเสียงผ่าน JavaScript ตรงๆ
       arTarget.addEventListener("targetFound", () => {
-        log("Target Found! Playing sound...");
-        audio.currentTime = 0; // เริ่มใหม่ทุกครั้งที่เจอ
-        audio.play().catch(e => log("Play failed: " + e));
+        console.log("Target Found! Banging the sound...");
+        myAudio.play(); // สั่งเล่นเสียงตรงๆ ไม่ผ่าน A-Frame
       });
 
       arTarget.addEventListener("targetLost", () => {
-        log("Target Lost. Stopping sound.");
-        audio.pause();
+        myAudio.pause();
       });
     </script>
   </body>
