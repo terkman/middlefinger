@@ -6,73 +6,87 @@
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
     
     <style>
-      /* หน้าจอ Overlay เพื่อขออนุญาตใช้เสียงและกล้อง */
       #ui-overlay {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background: rgba(0,0,0,0.9); z-index: 9999;
         display: flex; flex-direction: column; justify-content: center;
         align-items: center; color: white; font-family: sans-serif;
+        text-align: center; padding: 20px;
       }
       button {
-        padding: 15px 30px; font-size: 18px; cursor: pointer;
-        background: #2196F3; border: none; color: white; border-radius: 5px;
+        padding: 15px 30px; font-size: 20px; cursor: pointer;
+        background: #2196F3; border: none; color: white; border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
       }
+      p { margin-bottom: 20px; line-height: 1.5; }
     </style>
   </head>
   
   <body>
     <div id="ui-overlay">
       <h2>AR Experience</h2>
-      <p>ส่องภาพเพื่อดูข้อความและฟังเสียง</p>
+      <p>กรุณากดปุ่มเพื่อเริ่มใช้งาน<br>(เพื่อให้เสียงและกล้องทำงานได้ถูกต้อง)</p>
       <button id="start-button">เริ่มใช้งาน (Start)</button>
     </div>
 
-    <a-scene mindar-image="imageTargetSrc: ./targets.mind;" 
-             color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" 
-             vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+    <a-scene 
+      mindar-image="imageTargetSrc: ./targets.mind; autoStart: false;" 
+      color-space="sRGB" 
+      renderer="colorManagement: true, physicallyCorrectLights" 
+      vr-mode-ui="enabled: false" 
+      device-orientation-permission-ui="enabled: false">
       
       <a-assets>
-        <audio id="ask-voice" src="./voice.mp3" preload="auto"></audio>
+        <audio id="ask-voice" src="./voice.mp3" preload="auto" response-type="arraybuffer"></audio>
       </a-assets>
 
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
       <a-entity id="ar-target" mindar-image-target="targetIndex: 0">
+        <a-text value="How old are you?" 
+                color="#FFD700" 
+                align="center" 
+                width="3" 
+                position="0 0.4 0"
+                font="https://cdn.aframe.io/fonts/DejaVu-sans-mono.json"></a-text>
         
-        <a-text id="text-ui" value="How old are you?" 
-                color="#FFD700" align="center" width="4" 
-                position="0 0 0" 
-                background="color: #000; opacity: 0.5"></a-text>
-
-        <a-entity id="sound-entity" sound="src: #ask-voice; loop: false"></a-entity>
+        <a-entity id="sound-entity" sound="src: #ask-voice; autoplay: false; loop: false; poolSize: 1"></a-entity>
       </a-entity>
     </a-scene>
 
     <script>
       const startButton = document.querySelector("#start-button");
       const overlay = document.querySelector("#ui-overlay");
+      const sceneEl = document.querySelector("a-scene");
       const arTarget = document.querySelector("#ar-target");
       const soundEntity = document.querySelector("#sound-entity");
+      const audioTag = document.querySelector("#ask-voice");
 
-      // เมื่อกดปุ่ม Start
       startButton.addEventListener('click', () => {
         overlay.style.display = "none";
-        // ปลุกระบบเสียงให้พร้อมทำงาน (สำหรับ iOS)
-        const ctx = new AudioContext();
-        ctx.resume();
+
+        // 1. เริ่มระบบ Mind-AR (เพราะเราตั้ง autoStart: false ไว้)
+        sceneEl.systems["mindar-image-system"].start();
+
+        // 2. ปลดล็อกเสียงสำหรับ iOS/Android (User Gesture)
+        // เทคนิคคือสั่ง .play() แล้ว .pause() ทันทีเพื่อให้ Browser อนุญาต
+        audioTag.play().then(() => {
+          audioTag.pause();
+          audioTag.currentTime = 0;
+        }).catch(e => console.error("Audio unlock failed:", e));
+
+        // 3. ปลุก AudioContext ของ A-Frame
+        if (sceneEl.audioListener) {
+          sceneEl.audioListener.context.resume();
+        }
       });
 
-      // เหตุการณ์เมื่อ "สแกนเจอภาพ" (Target Found)
+      // เหตุการณ์เมื่อ "สแกนเจอภาพ"
       arTarget.addEventListener("targetFound", () => {
-        console.log("พบภาพ! เริ่มเล่นเสียงและแสดงข้อความ");
-        soundEntity.components.sound.playSound(); // เล่นเสียง
+        console.log("Found Target!");
+        // เล่นเสียงผ่าน Component ของ A-Frame
+        soundEntity.components.sound.playSound();
       });
 
-      // เหตุการณ์เมื่อ "ภาพหลุดจากกล้อง" (Target Lost)
+      // เหตุการณ์เมื่อ "ภาพหลุด"
       arTarget.addEventListener("targetLost", () => {
-        console.log("ภาพหลุดจากกล้อง");
-        soundEntity.components.sound.stopSound(); // หยุดเสียง
-      });
-    </script>
-  </body>
-</html>
