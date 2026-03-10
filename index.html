@@ -10,47 +10,40 @@
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background: rgba(0,0,0,0.9); z-index: 9999;
         display: flex; flex-direction: column; justify-content: center;
-        align-items: center; color: white; font-family: sans-serif;
-        text-align: center; padding: 20px;
+        align-items: center; color: white; font-family: sans-serif; text-align: center;
       }
       button {
-        padding: 15px 30px; font-size: 20px; cursor: pointer;
-        background: #2196F3; border: none; color: white; border-radius: 10px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        padding: 20px 40px; font-size: 22px; cursor: pointer;
+        background: #007bff; border: none; color: white; border-radius: 50px;
       }
-      p { margin-bottom: 20px; line-height: 1.5; }
+      /* ส่วนแสดงสถานะเพื่อการ Debug */
+      #debug-log {
+        position: fixed; bottom: 10px; left: 10px; color: yellow; 
+        background: rgba(0,0,0,0.5); z-index: 1000; font-size: 12px; pointer-events: none;
+      }
     </style>
   </head>
   
   <body>
+    <div id="debug-log">Status: Waiting for Start...</div>
+
     <div id="ui-overlay">
-      <h2>AR Experience</h2>
-      <p>กรุณากดปุ่มเพื่อเริ่มใช้งาน<br>(เพื่อให้เสียงและกล้องทำงานได้ถูกต้อง)</p>
-      <button id="start-button">เริ่มใช้งาน (Start)</button>
+      <h2>AR Audio System</h2>
+      <p>กดปุ่มเพื่ออนุญาตสิทธิ์การใช้เสียง</p>
+      <button id="start-button">START AR</button>
     </div>
+
+    <audio id="my-audio" src="./voice.mp3" preload="auto" playsinline></audio>
 
     <a-scene 
       mindar-image="imageTargetSrc: ./targets.mind; autoStart: false;" 
-      color-space="sRGB" 
-      renderer="colorManagement: true, physicallyCorrectLights" 
-      vr-mode-ui="enabled: false" 
-      device-orientation-permission-ui="enabled: false">
+      embedded color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" 
+      vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
       
-      <a-assets>
-        <audio id="ask-voice" src="./voice.mp3" preload="auto" response-type="arraybuffer"></audio>
-      </a-assets>
-
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
       <a-entity id="ar-target" mindar-image-target="targetIndex: 0">
-        <a-text value="How old are you?" 
-                color="#FFD700" 
-                align="center" 
-                width="3" 
-                position="0 0.4 0"
-                font="https://cdn.aframe.io/fonts/DejaVu-sans-mono.json"></a-text>
-        
-        <a-entity id="sound-entity" sound="src: #ask-voice; autoplay: false; loop: false; poolSize: 1"></a-entity>
+        <a-text value="How old are you?" color="#FFD700" align="center" width="4" position="0 0 0"></a-text>
       </a-entity>
     </a-scene>
 
@@ -59,34 +52,44 @@
       const overlay = document.querySelector("#ui-overlay");
       const sceneEl = document.querySelector("a-scene");
       const arTarget = document.querySelector("#ar-target");
-      const soundEntity = document.querySelector("#sound-entity");
-      const audioTag = document.querySelector("#ask-voice");
+      const audio = document.querySelector("#my-audio");
+      const debugLog = document.querySelector("#debug-log");
+
+      // ฟังก์ชันเขียน Log บนหน้าจอเพื่อเช็กว่าโค้ดทำงานถึงไหน
+      function log(msg) {
+        debugLog.innerText = "Status: " + msg;
+        console.log(msg);
+      }
 
       startButton.addEventListener('click', () => {
+        log("Starting...");
         overlay.style.display = "none";
 
-        // 1. เริ่มระบบ Mind-AR (เพราะเราตั้ง autoStart: false ไว้)
+        // 2. เทคนิคการ "ปลดล็อก" เสียง (สำคัญมากสำหรับ iOS)
+        // สั่งให้เล่นเสียงสั้นๆ ทันทีที่กดปุ่ม เพื่อขอสิทธิ์ Browser
+        audio.play().then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+          log("Audio Unlocked!");
+        }).catch(err => {
+          log("Audio Error: " + err);
+        });
+
+        // เริ่มระบบ AR
         sceneEl.systems["mindar-image-system"].start();
-
-        // 2. ปลดล็อกเสียงสำหรับ iOS/Android (User Gesture)
-        // เทคนิคคือสั่ง .play() แล้ว .pause() ทันทีเพื่อให้ Browser อนุญาต
-        audioTag.play().then(() => {
-          audioTag.pause();
-          audioTag.currentTime = 0;
-        }).catch(e => console.error("Audio unlock failed:", e));
-
-        // 3. ปลุก AudioContext ของ A-Frame
-        if (sceneEl.audioListener) {
-          sceneEl.audioListener.context.resume();
-        }
       });
 
-      // เหตุการณ์เมื่อ "สแกนเจอภาพ"
+      // 3. เมื่อเจอภาพ ให้สั่งเล่นเสียงผ่าน JavaScript ตรงๆ
       arTarget.addEventListener("targetFound", () => {
-        console.log("Found Target!");
-        // เล่นเสียงผ่าน Component ของ A-Frame
-        soundEntity.components.sound.playSound();
+        log("Target Found! Playing sound...");
+        audio.currentTime = 0; // เริ่มใหม่ทุกครั้งที่เจอ
+        audio.play().catch(e => log("Play failed: " + e));
       });
 
-      // เหตุการณ์เมื่อ "ภาพหลุด"
       arTarget.addEventListener("targetLost", () => {
+        log("Target Lost. Stopping sound.");
+        audio.pause();
+      });
+    </script>
+  </body>
+</html>
